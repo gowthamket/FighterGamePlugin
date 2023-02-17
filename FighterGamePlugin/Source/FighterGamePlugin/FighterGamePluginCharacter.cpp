@@ -43,6 +43,9 @@ AFighterGamePluginCharacter::AFighterGamePluginCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
+
+	wasFirstAttackUsed = false;
+	playerHealth = 1.00f;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -54,6 +57,11 @@ void AFighterGamePluginCharacter::SetupPlayerInputComponent(class UInputComponen
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AFighterGamePluginCharacter::MoveRight);
+
+	PlayerInputComponent->BindAction("Attack1", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack1);
+	PlayerInputComponent->BindAction("Attack2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack2);
+	PlayerInputComponent->BindAction("Attack3", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack3);
+	PlayerInputComponent->BindAction("Attack4", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack4);
 
 	PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
 	PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
@@ -75,4 +83,36 @@ void AFighterGamePluginCharacter::TouchStopped(const ETouchIndex::Type FingerInd
 {
 	StopJumping();
 }
+
+void AFighterGamePluginCharacter::StartAttack1()
+{
+	wasFirstAttackUsed = true;
+}
+
+void AFighterGamePluginCharacter::StartAttack2()
+{
+
+}
+
+void AFighterGamePluginCharacter::StartAttack3()
+{
+
+}
+
+void AFighterGamePluginCharacter::StartAttack4()
+{
+
+}
+
+void AFighterGamePluginCharacter::TakeDamage(float _damageAmount)
+{
+	playerHealth -= _damageAmount;
+
+	if (playerHealth < 0.00f)
+	{
+		playerHealth = 0.00f;
+	}
+}
+
+
 
