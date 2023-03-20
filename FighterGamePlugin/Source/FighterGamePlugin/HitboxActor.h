@@ -45,4 +45,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
 		float hitboxDamage;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
+		float hitstunTime;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
+		float blockstunTime;
 };
