@@ -51,4 +51,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
 		float blockstunTime;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
+		float pushbackDistance;
+
+	//The amount of distance to launch the player
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Hitbox")
+		float launchDistance;
 };

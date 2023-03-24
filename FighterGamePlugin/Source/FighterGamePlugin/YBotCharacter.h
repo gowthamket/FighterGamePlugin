@@ -15,4 +15,8 @@ class FIGHTERGAMEPLUGIN_API AYBotCharacter : public AFighterGamePluginCharacter
 {
 	GENERATED_BODY()
 	
+		virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent);
+
 };

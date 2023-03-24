@@ -62,6 +62,19 @@ AFighterGamePluginCharacter::AFighterGamePluginCharacter()
 	maxDistanceApart = 800.0f;
 	stunTime = 0.0f;
 	hurtbox = nullptr;
+	gravityScale = GetCharacterMovement()->GravityScale;
+	superMeterAmount = 0.0f;
+	wasSuperUsed = false;
+	wasLightExAttackUsed = false;
+	wasHeavyExAttackUsed = false;
+	wasMediumExAttackUsed = false;
+	canUseExAttack = true;
+	removeInputFromBufferTime = 1.0f;
+	tempCommand.name = "Temp Command";
+	tempCommand.inputs.Add("A");
+	tempCommand.inputs.Add("B");
+	tempCommand.inputs.Add("C");
+	hasUsedTempCommand = false;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -89,6 +102,10 @@ void AFighterGamePluginCharacter::SetupPlayerInputComponent(class UInputComponen
 
 			PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
 			PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
+
+			PlayerInputComponent->BindAction("ExceptionalAttackP1", IE_Pressed, this, &AFighterGamePluginCharacter::StartExceptionalAttack);
+
+			//PlayerInputComponent->BindAction("AddToInputBuffer", IE_Pressed, this, &AFighterGamePluginCharacter::AddInputToInputBuffer);
 		}
 		else
 		{
@@ -108,6 +125,10 @@ void AFighterGamePluginCharacter::SetupPlayerInputComponent(class UInputComponen
 
 			PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
 			PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
+
+			PlayerInputComponent->BindAction("ExceptionalAttackP1", IE_Pressed, this, &AFighterGamePluginCharacter::StartExceptionalAttack);
+
+			//PlayerInputComponent->BindAction("AddToInputBuffer", IE_Pressed, this, &AFighterGamePluginCharacter::AddInputToInputBuffer);
 		}
 	}
 	
@@ -117,18 +138,22 @@ void AFighterGamePluginCharacter::MoveRight(float Value)
 {
 	if (canMove && characterState != ECharacterState::VE_Crouching && characterState != ECharacterState::VE_Blocking)
 	{
-		if (Value > 0.20f)
+		if (characterState != ECharacterState::VE_Jumping && characterState != ECharacterState::VE_Launched)
 		{
-			characterState = ECharacterState::VE_MovingRight;
+			if (Value > 0.20f)
+			{
+				characterState = ECharacterState::VE_MovingRight;
+			}
+			else if (Value < -0.20f)
+			{
+				characterState = ECharacterState::VE_MovingLeft;
+			}
+			else
+			{
+				characterState = ECharacterState::VE_MovingRight;
+			}
 		}
-		else if (Value < -0.20f)
-		{
-			characterState = ECharacterState::VE_MovingLeft;
-		}
-		else
-		{
-			characterState = ECharacterState::VE_MovingRight;
-		}
+		
 	}
 
 		float currentDistanceApart = abs(otherPlayer->GetActorLocation().Y - GetActorLocation().Y);
@@ -224,7 +249,11 @@ void AFighterGamePluginCharacter::StartAttack3()
 
 void AFighterGamePluginCharacter::StartAttack4()
 {
-	wasSpecialAttackUsed = true;
+	if (superMeterAmount >= 1.0f)
+	{
+		wasSuperUsed = true;
+	}
+	
 }
 
 void AFighterGamePluginCharacter::CollidedWithProximityHitbox()
@@ -235,14 +264,14 @@ void AFighterGamePluginCharacter::CollidedWithProximityHitbox()
 	}
 }
 
-void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstunTime, float _blockstunTime)
+void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstunTime, float _blockstunTime, float _pushbackAmount, float _launchAmount)
 {
 	if (characterState != ECharacterState::VE_Blocking)
 	{
 		
 		stunTime = _hitstunTime;
 		playerHealth -= _damageAmount;
-		
+		superMeterAmount += _damageAmount * 0.85f;
 
 		if (stunTime > 0.0f)
 		{
@@ -253,7 +282,15 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 		if (otherPlayer)
 		{
 			otherPlayer->hasLandedHit = true;
+			otherPlayer->PerformPushback(_pushbackAmount, 0.0f, false);
+
+			if (!otherPlayer->wasLightExAttackUsed)
+			{
+				otherPlayer->superMeterAmount += (_damageAmount * 0.30f);
+			}
 		}
+
+		PerformPushback(_pushbackAmount, _launchAmount, true);
 	}
 	else
 	{
@@ -268,7 +305,10 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 		}
 		else
 		{
-			characterState = ECharacterState::VE_Default;
+			if (characterState != ECharacterState::VE_Launched)
+			{
+				characterState = ECharacterState::VE_Default;
+			}
 		}
 	}
 	
@@ -277,6 +317,10 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 	if (playerHealth < 0.00f)
 	{
 		playerHealth = 0.00f;
+	}
+	else if (playerHealth > 0.00f && playerHealth < 0.50f)
+	{
+		ChangeToDamagedMaterials();
 	}
 }
 
@@ -315,6 +359,11 @@ void AFighterGamePluginCharacter::P2KeyboardMoveRight(float _value)
 	MoveRight(_value);
 }
 
+void AFighterGamePluginCharacter::P2KeyboardExceptionalAttack()
+{
+	StartExceptionalAttack();
+}
+
 void AFighterGamePluginCharacter::Jump()
 {
 	characterState = ECharacterState::VE_Jumping;
@@ -327,7 +376,12 @@ void AFighterGamePluginCharacter::StopJumping()
 
 void AFighterGamePluginCharacter::Landed(const FHitResult& Hit)
 {
-	characterState = ECharacterState::VE_Default;
+	if (characterState == ECharacterState::VE_Launched || characterState == ECharacterState::VE_Jumping)
+	{
+		GetCharacterMovement()->GravityScale = gravityScale;
+		characterState = ECharacterState::VE_Default;
+	}
+	
 }
 
 void AFighterGamePluginCharacter::StartCrouching()
@@ -361,5 +415,118 @@ void AFighterGamePluginCharacter::ExitStun()
 {
 	characterState = ECharacterState::VE_Default;
 	canMove = true;
+}
+
+void AFighterGamePluginCharacter::AddInputToInputBuffer(FInputInfo _inputInfo)
+{
+	inputBuffer.Add(_inputInfo);
+	//GetWorld()->GetTimerHandle().SetTimer(inputBufferTimerHandle, this, &AFighterGamePluginCharacter::RemoveInputFromInputBuffer, removeInputFromBufferTime, false);
+}
+
+void AFighterGamePluginCharacter::RemoveInputFromInputBuffer()
+{
+
+}
+
+void AFighterGamePluginCharacter::PerformPushback(float _pushbackAmount, float _launchAmount, bool _hasBlocked)
+{
+	if (_hasBlocked)
+	{
+		if (isFlipped)
+		{
+			LaunchCharacter(FVector(0.0f, -_pushbackAmount * 2.0f, 0.0f), false, false);
+		}
+		else
+		{
+			LaunchCharacter(FVector(0.0f, _pushbackAmount * 2.0f, 0.0f), false, false);
+		}
+	}
+	else
+	{
+		if (_launchAmount > 0.0f)
+		{
+			GetCharacterMovement()->GravityScale *= 0.7;
+			characterState = ECharacterState::VE_Launched;
+		}
+
+		if (isFlipped)
+		{
+			
+			LaunchCharacter(FVector(0.0f, -_pushbackAmount, 0.0f), false, false);
+		}
+		else
+		{		
+			LaunchCharacter(FVector(0.0f, _pushbackAmount, 0.0f), false, false);
+		}
+	}
+}
+
+void AFighterGamePluginCharacter::StartExceptionalAttack()
+{
+	//UE_LOG(LogTemp, Warning, TEXT("The character is using their exceptional attack."))
+	if (wasLightAttackUsed)
+	{
+		wasLightExAttackUsed = true;
+		superMeterAmount -= 0.20f;
+	}
+	else if (wasMediumAttackUsed)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("The character is using their medium exceptional attack."))
+		wasMediumExAttackUsed = true;
+		superMeterAmount -= 0.35f;
+	}
+	else if (wasHeavyAttackUsed)
+	{
+		//UE_LOG(LogTemp, Warning, TEXT("The character is using their heavy exceptional attack."))
+		wasHeavyExAttackUsed = true;
+		superMeterAmount -= 0.50f;
+	}
+
+	if (superMeterAmount < 0.00f)
+	{
+		superMeterAmount = 0.00f;
+	}
+}
+
+void AFighterGamePluginCharacter::CheckInputBufferForCommand()
+{
+	int correctSequenceCounter = 0;
+
+	for (int commandInput = 0; commandInput < tempCommand.inputs.Num(); ++commandInput)
+	{
+		for (int input = 0; input < inputBuffer.Num(); ++input)
+		{
+			if (input + correctSequenceCounter < inputBuffer.Num())
+			{
+				if (inputBuffer[input + correctSequenceCounter].inputName.Compare(tempCommand.inputs[commandInput]) == 0)
+				{
+					++correctSequenceCounter;
+
+					if (correctSequenceCounter == tempCommand.inputs.Num())
+					{
+						StartCommand(tempCommand.name);
+					}
+
+					break;
+				}
+				else
+				{
+					correctSequenceCounter = 0;
+				}
+			}
+			else
+			{
+				correctSequenceCounter = 0;
+			}
+		}
+	}
+}
+
+void AFighterGamePluginCharacter::StartCommand(FString _commandName)
+{
+	if (_commandName.Compare(tempCommand.name) == 0)
+	{
+		hasUsedTempCommand = true;
+	}
 }
 
