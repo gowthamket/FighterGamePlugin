@@ -12,8 +12,6 @@ AHitboxActor::AHitboxActor()
 	hitboxDamage = 0.0f;
 	hitstunTime = 0.0f;
 	blockstunTime = 0.0f;
-	pushbackDistance = 0.0f;
-	launchDistance = 0.0f;
 }
 
 // Called when the game starts or when spawned

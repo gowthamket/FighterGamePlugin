@@ -7,6 +7,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include <FighterGamePlugin/FighterGamePluginGameMode.h>
+#include <FighterGamePlugin/BaseGameInstance.h>
 
 AFighterGamePluginCharacter::AFighterGamePluginCharacter()
 {
@@ -62,19 +63,32 @@ AFighterGamePluginCharacter::AFighterGamePluginCharacter()
 	maxDistanceApart = 800.0f;
 	stunTime = 0.0f;
 	hurtbox = nullptr;
-	gravityScale = GetCharacterMovement()->GravityScale;
-	superMeterAmount = 0.0f;
-	wasSuperUsed = false;
+	hasUsedTempCommand = false;
 	wasLightExAttackUsed = false;
 	wasHeavyExAttackUsed = false;
 	wasMediumExAttackUsed = false;
-	canUseExAttack = true;
-	removeInputFromBufferTime = 1.0f;
-	tempCommand.name = "Temp Command";
-	tempCommand.inputs.Add("A");
-	tempCommand.inputs.Add("B");
-	tempCommand.inputs.Add("C");
-	hasUsedTempCommand = false;
+	wasSuperUsed = false;
+	superMeterAmount = 0.0f;
+
+
+	hasReleasedAxisInput = true;
+
+	//Create and assign the character's commands
+	characterCommands.SetNum(2);
+
+	//Command #1 assignments
+	characterCommands[0].name = "Command #1";
+	characterCommands[0].inputs.Add("A");
+	characterCommands[0].inputs.Add("B");
+	characterCommands[0].inputs.Add("C");
+	characterCommands[0].hasUsedCommand = false;
+
+	//Command #2 assignments
+	characterCommands[1].name = "Command #2";
+	characterCommands[1].inputs.Add("A");
+	characterCommands[1].inputs.Add("B");
+	characterCommands[1].inputs.Add("C");
+	characterCommands[1].hasUsedCommand = false;
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -86,90 +100,97 @@ void AFighterGamePluginCharacter::SetupPlayerInputComponent(class UInputComponen
 	{
 		if (gamemode->player1 == this)
 		{
-			// set up gameplay key bindings
-			PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AFighterGamePluginCharacter::Jump);
-			PlayerInputComponent->BindAction("Jump", IE_Released, this, &AFighterGamePluginCharacter::StopJumping);
-			PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AFighterGamePluginCharacter::StartCrouching);
-			PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AFighterGamePluginCharacter::StopCrouching);
-			PlayerInputComponent->BindAction("Block", IE_Pressed, this, &AFighterGamePluginCharacter::StartBlocking);
-			PlayerInputComponent->BindAction("Block", IE_Released, this, &AFighterGamePluginCharacter::StopBlocking);
-			PlayerInputComponent->BindAxis("MoveRight", this, &AFighterGamePluginCharacter::MoveRight);
-
-			PlayerInputComponent->BindAction("Attack1P1", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack1);
-			PlayerInputComponent->BindAction("Attack2P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack2);
-			PlayerInputComponent->BindAction("Attack3P3", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack3);
-			PlayerInputComponent->BindAction("Attack4P4", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack4);
-
-			PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
-			PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
-
-			PlayerInputComponent->BindAction("ExceptionalAttackP1", IE_Pressed, this, &AFighterGamePluginCharacter::StartExceptionalAttack);
-
-			//PlayerInputComponent->BindAction("AddToInputBuffer", IE_Pressed, this, &AFighterGamePluginCharacter::AddInputToInputBuffer);
+			PlayerInputComponent->BindAxis("MoveRightP1", this, &AFighterGamePluginCharacter::MoveRight);
 		}
 		else
 		{
-			// set up gameplay key bindings
-			PlayerInputComponent->BindAction("JumpP2", IE_Pressed, this, &AFighterGamePluginCharacter::Jump);
-			PlayerInputComponent->BindAction("JumpP2", IE_Released, this, &AFighterGamePluginCharacter::StopJumping);
-			PlayerInputComponent->BindAction("CrouchP2", IE_Pressed, this, &AFighterGamePluginCharacter::StartCrouching);
-			PlayerInputComponent->BindAction("CrouchP2", IE_Released, this, &AFighterGamePluginCharacter::StopCrouching);
-			PlayerInputComponent->BindAction("BlockP2", IE_Pressed, this, &AFighterGamePluginCharacter::StartBlocking);
-			PlayerInputComponent->BindAction("BlockP2", IE_Released, this, &AFighterGamePluginCharacter::StopBlocking);
 			PlayerInputComponent->BindAxis("MoveRightP2", this, &AFighterGamePluginCharacter::MoveRight);
-
-			PlayerInputComponent->BindAction("Attack1P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack1);
-			PlayerInputComponent->BindAction("Attack2P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack2);
-			PlayerInputComponent->BindAction("Attack3P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack3);
-			PlayerInputComponent->BindAction("Attack4P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack4);
-
-			PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
-			PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
-
-			PlayerInputComponent->BindAction("ExceptionalAttackP1", IE_Pressed, this, &AFighterGamePluginCharacter::StartExceptionalAttack);
-
-			//PlayerInputComponent->BindAction("AddToInputBuffer", IE_Pressed, this, &AFighterGamePluginCharacter::AddInputToInputBuffer);
 		}
+
+		// set up gameplay key bindings
+		PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &AFighterGamePluginCharacter::Jump);
+		PlayerInputComponent->BindAction("Jump", IE_Released, this, &AFighterGamePluginCharacter::StopJumping);
+		PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AFighterGamePluginCharacter::StartCrouching);
+		PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AFighterGamePluginCharacter::StopCrouching);
+		PlayerInputComponent->BindAction("Block", IE_Pressed, this, &AFighterGamePluginCharacter::StartBlocking);
+		PlayerInputComponent->BindAction("Block", IE_Released, this, &AFighterGamePluginCharacter::StopBlocking);
+		PlayerInputComponent->BindAxis("MoveRight", this, &AFighterGamePluginCharacter::MoveRight);
+
+		PlayerInputComponent->BindAction("Attack1P1", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack1);
+		PlayerInputComponent->BindAction("Attack2P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack2);
+		PlayerInputComponent->BindAction("Attack3P3", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack3);
+		PlayerInputComponent->BindAction("Attack4P4", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack4);
+
+		PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
+		PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
+
+		// set up gameplay key bindings
+		PlayerInputComponent->BindAction("JumpP2", IE_Pressed, this, &AFighterGamePluginCharacter::Jump);
+		PlayerInputComponent->BindAction("JumpP2", IE_Released, this, &AFighterGamePluginCharacter::StopJumping);
+		PlayerInputComponent->BindAction("CrouchP2", IE_Pressed, this, &AFighterGamePluginCharacter::StartCrouching);
+		PlayerInputComponent->BindAction("CrouchP2", IE_Released, this, &AFighterGamePluginCharacter::StopCrouching);
+		PlayerInputComponent->BindAction("BlockP2", IE_Pressed, this, &AFighterGamePluginCharacter::StartBlocking);
+		PlayerInputComponent->BindAction("BlockP2", IE_Released, this, &AFighterGamePluginCharacter::StopBlocking);
+		PlayerInputComponent->BindAxis("MoveRightP2", this, &AFighterGamePluginCharacter::MoveRight);
+
+		PlayerInputComponent->BindAction("Attack1P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack1);
+		PlayerInputComponent->BindAction("Attack2P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack2);
+		PlayerInputComponent->BindAction("Attack3P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack3);
+		PlayerInputComponent->BindAction("Attack4P2", IE_Pressed, this, &AFighterGamePluginCharacter::StartAttack4);
+
+		PlayerInputComponent->BindTouch(IE_Pressed, this, &AFighterGamePluginCharacter::TouchStarted);
+		PlayerInputComponent->BindTouch(IE_Released, this, &AFighterGamePluginCharacter::TouchStopped);
 	}
 	
 }
 
 void AFighterGamePluginCharacter::MoveRight(float Value)
 {
-	if (canMove && characterState != ECharacterState::VE_Crouching && characterState != ECharacterState::VE_Blocking)
+	if (auto baseGameInstance = Cast<UBaseGameInstance>(GetGameInstance()))
 	{
-		if (characterState != ECharacterState::VE_Jumping && characterState != ECharacterState::VE_Launched)
+		if (baseGameInstance->isDeviceForMultiplePlayers)
 		{
-			if (Value > 0.20f)
+			if (canMove && characterState != ECharacterState::VE_Crouching && characterState != ECharacterState::VE_Blocking)
 			{
-				characterState = ECharacterState::VE_MovingRight;
+				if (characterState != ECharacterState::VE_Jumping && characterState != ECharacterState::VE_Launched)
+				{
+					if (Value > 0.20f)
+					{
+						characterState = ECharacterState::VE_MovingRight;
+						AddInputIconToScreen(1, hasReleasedAxisInput);
+						hasReleasedAxisInput = false;
+					}
+					else if (Value < -0.20f)
+					{
+						characterState = ECharacterState::VE_MovingLeft;
+						AddInputIconToScreen(3, hasReleasedAxisInput);
+						hasReleasedAxisInput = false;
+					}
+					else
+					{
+						characterState = ECharacterState::VE_MovingRight;
+						hasReleasedAxisInput = true;
+					}
+				}
 			}
-			else if (Value < -0.20f)
+
+			float currentDistanceApart = abs(otherPlayer->GetActorLocation().Y - GetActorLocation().Y);
+
+			if (currentDistanceApart >= maxDistanceApart)
 			{
-				characterState = ECharacterState::VE_MovingLeft;
+				if ((currentDistanceApart + Value < currentDistanceApart && !isFlipped) || (currentDistanceApart - Value < currentDistanceApart && isFlipped))
+				{
+					AddMovementInput(FVector(0.f, 1.0f, 0.f), Value);
+				}
+				else
+				{
+					AddMovementInput(FVector(0.0f, 1.0f, 0.0f), Value);
+				}
 			}
-			else
-			{
-				characterState = ECharacterState::VE_MovingRight;
-			}
+
 		}
-		
 	}
-
-		float currentDistanceApart = abs(otherPlayer->GetActorLocation().Y - GetActorLocation().Y);
-
-		if (currentDistanceApart >= maxDistanceApart)
-		{
-			if ((currentDistanceApart + Value < currentDistanceApart && !isFlipped) || (currentDistanceApart - Value < currentDistanceApart && isFlipped))
-			{
-				AddMovementInput(FVector(0.f, 1.0f, 0.f), Value);
-			}
-			else
-			{
-				AddMovementInput(FVector(0.0f, 1.0f, 0.0f), Value);
-			}
-		}
-
+	
 		
 }
 
@@ -235,16 +256,19 @@ void AFighterGamePluginCharacter::TouchStopped(const ETouchIndex::Type FingerInd
 void AFighterGamePluginCharacter::StartAttack1()
 {
 	wasLightAttackUsed = true;
+	AddInputIconToScreen(4);
 }
 
 void AFighterGamePluginCharacter::StartAttack2()
 {
 	wasMediumAttackUsed = true;
+	AddInputIconToScreen(5);
 }
 
 void AFighterGamePluginCharacter::StartAttack3()
 {
 	wasHeavyAttackUsed = true;
+	AddInputIconToScreen(6);
 }
 
 void AFighterGamePluginCharacter::StartAttack4()
@@ -252,8 +276,33 @@ void AFighterGamePluginCharacter::StartAttack4()
 	if (superMeterAmount >= 1.0f)
 	{
 		wasSuperUsed = true;
+		AddInputIconToScreen(7);
 	}
 	
+}
+
+void AFighterGamePluginCharacter::StartExceptionalAttack()
+{
+	if (wasLightAttackUsed)
+	{
+		wasLightExAttackUsed = true;
+		superMeterAmount -= 0.20f;
+	}
+	else if (wasMediumAttackUsed)
+	{
+		wasMediumExAttackUsed = true;
+		superMeterAmount -= 0.35f;
+	}
+	else if (wasHeavyAttackUsed)
+	{
+		wasHeavyExAttackUsed = true;
+		superMeterAmount -= 0.50f;
+	}
+
+	if (superMeterAmount < 0.00f)
+	{
+		superMeterAmount = 0.00f;
+	}
 }
 
 void AFighterGamePluginCharacter::CollidedWithProximityHitbox()
@@ -264,7 +313,7 @@ void AFighterGamePluginCharacter::CollidedWithProximityHitbox()
 	}
 }
 
-void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstunTime, float _blockstunTime, float _pushbackAmount, float _launchAmount)
+void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstunTime, float _blockstunTime)
 {
 	if (characterState != ECharacterState::VE_Blocking)
 	{
@@ -282,15 +331,15 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 		if (otherPlayer)
 		{
 			otherPlayer->hasLandedHit = true;
-			otherPlayer->PerformPushback(_pushbackAmount, 0.0f, false);
+			//otherPlayer->PerformPushback(_pushbackAmount, 0.0f, false);
 
 			if (!otherPlayer->wasLightExAttackUsed)
 			{
-				otherPlayer->superMeterAmount += (_damageAmount * 0.30f);
+				otherPlayer->superMeterAmount += _damageAmount * 0.30f;
 			}
 		}
 
-		PerformPushback(_pushbackAmount, _launchAmount, true);
+		//PerformPushback(_pushbackAmount, _launchAmount, false);
 	}
 	else
 	{
@@ -309,7 +358,16 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 			{
 				characterState = ECharacterState::VE_Default;
 			}
+			
 		}
+
+		if (otherPlayer)
+		{
+			otherPlayer->hasLandedHit = false;
+			//otherPlayer->PerformPushback(_pushbackAmount, 0.0f, false);
+		}
+
+		//PerformPushback(_pushbackAmount, 0.0f, true);
 	}
 	
 	
@@ -317,10 +375,6 @@ void AFighterGamePluginCharacter::TakeDamage(float _damageAmount, float _hitstun
 	if (playerHealth < 0.00f)
 	{
 		playerHealth = 0.00f;
-	}
-	else if (playerHealth > 0.00f && playerHealth < 0.50f)
-	{
-		ChangeToDamagedMaterials();
 	}
 }
 
@@ -344,6 +398,11 @@ void AFighterGamePluginCharacter::P2KeyboardAttack4()
 	StartAttack4();
 }
 
+void AFighterGamePluginCharacter::P2KeyboardExceptionalAttack()
+{
+	StartExceptionalAttack();
+}
+
 void AFighterGamePluginCharacter::P2KeyboardJump()
 {
 	Jump();
@@ -359,14 +418,15 @@ void AFighterGamePluginCharacter::P2KeyboardMoveRight(float _value)
 	MoveRight(_value);
 }
 
-void AFighterGamePluginCharacter::P2KeyboardExceptionalAttack()
-{
-	StartExceptionalAttack();
-}
-
 void AFighterGamePluginCharacter::Jump()
 {
-	characterState = ECharacterState::VE_Jumping;
+	if (canMove)
+	{
+		ACharacter::Jump();
+		characterState = ECharacterState::VE_Jumping;
+		AddInputIconToScreen(0);
+	}
+	
 }
 
 void AFighterGamePluginCharacter::StopJumping()
@@ -376,12 +436,7 @@ void AFighterGamePluginCharacter::StopJumping()
 
 void AFighterGamePluginCharacter::Landed(const FHitResult& Hit)
 {
-	if (characterState == ECharacterState::VE_Launched || characterState == ECharacterState::VE_Jumping)
-	{
-		GetCharacterMovement()->GravityScale = gravityScale;
-		characterState = ECharacterState::VE_Default;
-	}
-	
+	characterState = ECharacterState::VE_Default;
 }
 
 void AFighterGamePluginCharacter::StartCrouching()
@@ -420,113 +475,57 @@ void AFighterGamePluginCharacter::ExitStun()
 void AFighterGamePluginCharacter::AddInputToInputBuffer(FInputInfo _inputInfo)
 {
 	inputBuffer.Add(_inputInfo);
-	//GetWorld()->GetTimerHandle().SetTimer(inputBufferTimerHandle, this, &AFighterGamePluginCharacter::RemoveInputFromInputBuffer, removeInputFromBufferTime, false);
-}
-
-void AFighterGamePluginCharacter::RemoveInputFromInputBuffer()
-{
-
-}
-
-void AFighterGamePluginCharacter::PerformPushback(float _pushbackAmount, float _launchAmount, bool _hasBlocked)
-{
-	if (_hasBlocked)
-	{
-		if (isFlipped)
-		{
-			LaunchCharacter(FVector(0.0f, -_pushbackAmount * 2.0f, 0.0f), false, false);
-		}
-		else
-		{
-			LaunchCharacter(FVector(0.0f, _pushbackAmount * 2.0f, 0.0f), false, false);
-		}
-	}
-	else
-	{
-		if (_launchAmount > 0.0f)
-		{
-			GetCharacterMovement()->GravityScale *= 0.7;
-			characterState = ECharacterState::VE_Launched;
-		}
-
-		if (isFlipped)
-		{
-			
-			LaunchCharacter(FVector(0.0f, -_pushbackAmount, 0.0f), false, false);
-		}
-		else
-		{		
-			LaunchCharacter(FVector(0.0f, _pushbackAmount, 0.0f), false, false);
-		}
-	}
-}
-
-void AFighterGamePluginCharacter::StartExceptionalAttack()
-{
-	//UE_LOG(LogTemp, Warning, TEXT("The character is using their exceptional attack."))
-	if (wasLightAttackUsed)
-	{
-		wasLightExAttackUsed = true;
-		superMeterAmount -= 0.20f;
-	}
-	else if (wasMediumAttackUsed)
-	{
-		//UE_LOG(LogTemp, Warning, TEXT("The character is using their medium exceptional attack."))
-		wasMediumExAttackUsed = true;
-		superMeterAmount -= 0.35f;
-	}
-	else if (wasHeavyAttackUsed)
-	{
-		//UE_LOG(LogTemp, Warning, TEXT("The character is using their heavy exceptional attack."))
-		wasHeavyExAttackUsed = true;
-		superMeterAmount -= 0.50f;
-	}
-
-	if (superMeterAmount < 0.00f)
-	{
-		superMeterAmount = 0.00f;
-	}
+	CheckInputBufferForCommand();
 }
 
 void AFighterGamePluginCharacter::CheckInputBufferForCommand()
 {
 	int correctSequenceCounter = 0;
 
-	for (int commandInput = 0; commandInput < tempCommand.inputs.Num(); ++commandInput)
+	for (auto currentCommand : characterCommands)
 	{
-		for (int input = 0; input < inputBuffer.Num(); ++input)
+		for (int commandInput = 0; commandInput < tempCommand.inputs.Num(); ++commandInput)
 		{
-			if (input + correctSequenceCounter < inputBuffer.Num())
+			for (int input = 0; input < inputBuffer.Num(); ++input)
 			{
-				if (inputBuffer[input + correctSequenceCounter].inputName.Compare(tempCommand.inputs[commandInput]) == 0)
+				if (input + correctSequenceCounter < inputBuffer.Num())
 				{
-					++correctSequenceCounter;
-
-					if (correctSequenceCounter == tempCommand.inputs.Num())
+					if (inputBuffer[input + correctSequenceCounter].inputName.Compare(tempCommand.inputs[commandInput]) == 0)
 					{
-						StartCommand(tempCommand.name);
-					}
+						++correctSequenceCounter;
 
-					break;
+						if (correctSequenceCounter == tempCommand.inputs.Num())
+						{
+							StartCommand(tempCommand.name);
+						}
+
+						break;
+					}
+					else
+					{
+						correctSequenceCounter = 0;
+					}
 				}
 				else
 				{
 					correctSequenceCounter = 0;
 				}
 			}
-			else
-			{
-				correctSequenceCounter = 0;
-			}
 		}
 	}
+
+	
 }
 
 void AFighterGamePluginCharacter::StartCommand(FString _commandName)
 {
-	if (_commandName.Compare(tempCommand.name) == 0)
+	for (int currentCommand = 0; currentCommand < characterCommands.Num(); ++currentCommand)
 	{
-		hasUsedTempCommand = true;
+		if (_commandName.Compare(characterCommands[currentCommand].name) == 0)
+		{
+			characterCommands[currentCommand].hasUsedCommand = true;
+		}
 	}
+	
 }
 

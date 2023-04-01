@@ -25,4 +25,8 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Player References")
 		ECharacterClass characterClass;
+
+	//Is the device intended to be used for multiple players (keyboard mode)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Controller")
+		bool isDeviceForMultiplePlayers;
 };
